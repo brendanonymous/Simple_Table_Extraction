@@ -1,4 +1,4 @@
-# Simple_Table_Extraction
+# Table Extraction with OCR
 Simple OpenCV/Tesseract script that uses optical character recognition to extract data tables from a .jpeg or .pdf then writes it to an excel file
 
 # Usage
