@@ -56,6 +56,17 @@ def showImage(image, title):
 
 
 
+def showResizedImage(image, scalePercent, title):
+    """RESIZE IMAGE THEN SHOW FOR DEBUGGING"""
+    newWidth = int(image.shape[1] * scalePercent / 100)
+    newHeight = int(image.shape[0] * scalePercent / 100)
+    dimension = (newWidth, newHeight)
+    resizedImage = cv.resize(image, dimension, interpolation=cv.INTER_AREA)
+
+    showImage(resizedImage, title)
+
+
+
 def showContours(contours):
     """SHOW CONTOURS FOR DEBUGGING"""
     contours_image = np.zeros((720,1280,3), np.uint8)
