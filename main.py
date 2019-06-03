@@ -1,91 +1,90 @@
 import cv2 as cv
+import json
+import numpy as np
 from openpyxl import Workbook, load_workbook
 import os
+import sys
 import utils
 
 def getTable(original_image, outputSheetNum):
-    """GET TABLE FROM IMAGE AND WRITE TO EXCEL"""
+    """GET TABLE FROM MS ENTERPRISE SWO IMAGE AND BUILD JSON STRUCTURE"""
     ###################################
     # CONVERT COLORSPACE TO NEGATIVE
     ###################################
+    original_image = cv.resize(original_image, (int(original_image.shape[1] * 0.2), int(original_image.shape[0]*0.2)), interpolation = cv.INTER_AREA)
     gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
 
-    # utils.showResizedImage(gray_image, 13, "gray") # DEBUG
+
+
+    ###############################################
+    # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
+    ###############################################
+    threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 1)    
+    threshold = cv.bitwise_not(threshold) # negative
 
 
 
-    ###################################
-    # APPLY ADAPTIVE THRESHOLD
-    ###################################
-    gray_image = cv.bitwise_not(gray_image)
-
-    image_withThreshold = cv.adaptiveThreshold(gray_image,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
-
-    utils.showResizedImage(image_withThreshold, 25, "threshold") # DEBUG
-
-    # close lines?
-    # DILATE HERE
-
-
-
-    ###################################
+    ###############################################
     # EXTRACT TABLE LINES
-    ###################################
-    horizontal_lines, vertical_lines = utils.extractTableLines(image_withThreshold)
+    ###############################################
+    h = np.copy(threshold)
+    v = np.copy(threshold)
+
+
+    # get horizontal lines
+    k = np.ones((1, 47), np.uint8)
+
+    h = cv.erode(h, k, iterations=3)
+    h = cv.dilate(h, k, iterations=3)
+
+
+    # get vertical lines
+    k = np.ones((15,1), np.uint8)
+
+    v = cv.erode(v, k, iterations=2)
+    v = cv.dilate(v, k, iterations=2)
 
 
 
-    ###################################
+    ###############################################
     # CREATE LINE MASK AND FIND CONTOURS
-    ################################### 
-    line_mask = horizontal_lines + vertical_lines
+    ###############################################
+    line_mask = h + v
 
-    utils.showResizedImage(line_mask, 13, "line mask")
-
-    (contours, _) = cv.findContours(line_mask, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
+    (contours, _) = cv.findContours(line_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
 
 
-    # ###################################
-    # # EXTRACT TABLE AND OCR
-    # ###################################
-    # x_bounds = set()
-    # y_bounds = set()
-    # numRows = 0
-    # numCols = 0
-    # texts = []
+    # ###############################################
+    # EXTRACT TABLE AND OCR
+    # ###############################################
 
-    # for i in range(len(contours) - 2, -1, -1):
-    #     x, y, w, h = cv.boundingRect(contours[i]) # get contour coordinates
-    #     x += 1; w -= 2 # offset HARD CODING, LOL YIKES
-    #     box = original_image[y:y + h, x:x + w] # get bounding box
-    #     texts.append(utils.run_tesseract(box, 8, 3)) # extract text from bounding box with Tesseract
+    texts = []
+    cells = []
+    data = {}
 
-    #     # use bounding box coordinates to track num rows and num cols
-    #     if x not in x_bounds:
-    #         x_bounds.add(x)
-    #         numCols += 1
-    #     if y not in y_bounds:
-    #         y_bounds.add(y)
-    #         numRows += 1
+    for i in range(len(contours) - 2, -1, -1):
+        x, y, w, h = cv.boundingRect(contours[i]) # get contour coordinates
+        box = gray_image[y:y + h, x:x + w] # get bounding box
+        cells.append((x,y,w,h))
+        texts.append(utils.run_tesseract(box, 6, 3)) # extract text from bounding box with Tesseract
 
 
 
-    # ###################################
-    # # WRITE TABLE TO EXCEL
-    # ###################################    
-    # if not os.path.exists("test_table.xlsx"): # create new workbook with new sheet
-    #     workbook = Workbook()
-    #     worksheet = workbook.active
-    #     worksheet.title = "table {} from image".format(outputSheetNum)
-    # else: # add new sheet
-    #     workbook = load_workbook("test_table.xlsx")
-    #     worksheet = workbook.create_sheet("table {} from image".format(outputSheetNum))
+    # ###############################################
+    # STRUCTURE DATA
+    # ###############################################
+    for i in range(len(cells) - 1):
+        c = cells[i][0], cells[i][2]
+        if str(c) in data:
+            data[str(c)].append(texts[i])
+        elif str((c[0], c[1] + 1)) in data:
+            data[str((c[0], c[1] + 1))].append(texts[i])
+        else:
+            data[str(c)] = [texts[i]]
 
-    # text_index = 0
-    # for Row in range(1, numRows + 1): # double for loop, sue me THERE IS A BETTER WAY TO DO THIS
-    #     for Col in range(1, numCols + 1):
-    #         worksheet.cell(row=Row, column=Col).value = texts[text_index]
-    #         text_index += 1
+    json_data = json.dumps(data)
 
-    # workbook.save(filename="test_table.xlsx")
+    print(json_data)
+
+    exit()

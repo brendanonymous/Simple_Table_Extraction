@@ -1,4 +1,4 @@
-__title__ = "Table Image Extractor"
+__title__ = "MS Enterprise SWO Table Image Extractor"
 __author__ = "Brendan Lauck"
 __maintainer__ = "Brendan Lauck"
 __email__ = "brendanlauck@gmail.com"
