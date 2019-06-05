@@ -16,12 +16,28 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         imagePath = sys.argv[1]
         if imagePath[-4:] == ".pdf":
-            numPages = utils.pdfToJpg(imagePath)
-            for pageNum in range(1, numPages + 1):
-                img = cv.imread("out{}.jpg".format(pageNum))
-                main.getTable(img, pageNum)
-        elif imagePath[-4:] == ".jpg":
-            main.getTable(cv.imread(imagePath), 1)
+            _ = utils.pdfToJpg(imagePath)
+            # get table 1
+            # img = cv.imread("out1.jpg")
+            # main.getMSEntTable1(img)
+
+            # get table 2
+            # img = cv.imread("out2.jpg")
+            # main.getMSEntTable2(img)
+
+            # get table 3
+            img = cv.imread("out3.jpg")
+            main.getMSEntTable3(img)
+
+            # get table 1 from sample 4.pdf
+            # img = cv.imread("out1.jpg")
+            # main.getSample4Table1(img)
+
+            # get tables from page 1 of sample 5
+            # img = cv.imread("out1.jpg")
+            # main.getSample5Table1(img)
+        else:
+            print("Error: file must be in PDF format")
     else:
         print("Error: Usage: python get-table.py <path to image>")
     
