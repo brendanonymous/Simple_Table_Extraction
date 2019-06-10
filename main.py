@@ -55,14 +55,14 @@ def getMSEntTable1(original_image):
         box = gray_image[y:y + h, x:x + w] # get bounding box
         if cv.mean(box)[0] < 155: # detect headers for specific table style
             _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
-        cells.append([x,w])
-        texts.append(utils.run_tesseract(box, 3, 3)) # OCR w/in bounding box
+        cells.append([x, y, w, h])
+        # texts.append(utils.run_tesseract(box, 3, 3)) # OCR w/in bounding box
 
 
     # #############################################
     # EXTRACT NON TABLE DATA AND OCR
     # #############################################
-    texts.append(utils.extractNonTableData(gray_image, contours))
+    # texts.append(utils.extractNonTableData(gray_image, contours))
 
 
     # ###############################################
@@ -70,15 +70,16 @@ def getMSEntTable1(original_image):
     # ###############################################
     if len(cells) > 0:
         for i in range(len(cells) - 1):
-            c = cells[i]
-            if str(c) in data:
-                data[str(c)].append(texts[i])
-            elif str((c[0], c[1] + 1)) in data:
-                data[str((c[0], c[1] + 1))].append(texts[i])
-            else:
-                data[str(c)] = [texts[i]]
+            print (cells[i])
+            # c = cells[i]
+            # if str(c) in data:
+            #     data[str(c)].append(texts[i])
+            # elif str((c[0], c[1] + 1)) in data:
+            #     data[str((c[0], c[1] + 1))].append(texts[i])
+            # else:
+            #     data[str(c)] = [texts[i]]
 
-    data["non-table data"] = texts[-1]
+    data["non-table data"] = texts[-1] # non tabular data
 
     json_data = json.dumps(data, indent=3)
 
