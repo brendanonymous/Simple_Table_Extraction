@@ -16,7 +16,7 @@ def getMSEntTable1(original_image):
     ###############################################
     # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
     ###############################################
-    threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 1)    
+    threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
     threshold = cv.bitwise_not(threshold)
 
     utils.showImage(threshold, "image with applied threshold", 70) ## DEBUG
@@ -25,39 +25,49 @@ def getMSEntTable1(original_image):
     ###############################################
     # EXTRACT TABLE LINES
     ###############################################
-    horizontal, vertical = utils.extractTableLines(threshold, 90, 30)
-
-    utils.showImage(horizontal, "horizontal lines", 70) ## DEBUG
-    utils.showImage(vertical, "vertical lines", 70) ## DEBUG
+    horizontal, vertical = utils.extractTableLines(threshold, 150, 30)    
 
 
     ###############################################
-    # CREATE LINE MASK AND FIND CONTOURS
+    # CREATE LINE MASK AND FIND EXTERNAL CONTOURS
     ###############################################
     line_mask = horizontal + vertical
 
     utils.showImage(line_mask, "table lines", 70) ## DEBUG
 
-    (contours, _) = cv.findContours(line_mask, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
+    table_outline_contours, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
     
-    utils.showContoursIter(contours, 70) ## DEBUG
-    exit()
+    utils.showContours(table_outline_contours, 70) ## DEBUG
 
 
     # ###############################################
-    # EXTRACT TABLE AND OCR
+    # EXTRACT TABLES AND OCR
     # ###############################################
     texts = []
     cells = []
     data = {}
 
-    for i in range(len(contours) - 2, -1, -1):
-        x, y, w, h = cv.boundingRect(contours[i]) # get contour coordinates
-        box = gray_image[y:y + h, x:x + w] # get bounding box
-        if cv.mean(box)[0] < 155: # detect headers for specific table style
-            _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
-        cells.append([x, y, w, h])
-        texts.append(utils.run_tesseract(box, 3, 3)) # OCR w/in bounding box
+    # for each table outline contour, get inner contours then perform OCR
+    for table_outline in table_outline_contours:
+        x, y, w, h = cv.boundingRect(table_outline) # get contour coordinates
+        box = gray_image[y - 1:y + h + 1, x - 1:x + w + 1] # get bounding box (slightly enlarged)
+        box = cv.bitwise_not(cv.adaptiveThreshold(box, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)) # threshold
+        h, v = utils.extractTableLines(box, 150, 30) # get lines
+        cell_cntrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get lines
+        for i in range(len(cell_cntrs) - 2, -1, -1):
+            x, y, w, h = cv.boundingRect(cell_cntrs[i])
+            box = gray_image[y:y + h, x:x + w]
+            if cv.mean(box)[0] < 155: # detect headers for specific table style
+                _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
+            # structure data and OCR
+
+
+
+
+        # if cv.mean(box)[0] < 155: # detect headers for specific table style
+        #     _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
+        # cells.append([x, y, w, h])
+        # texts.append(utils.run_tesseract(box, 3, 3)) # OCR w/in bounding box
 
 
     # #############################################
@@ -69,9 +79,9 @@ def getMSEntTable1(original_image):
     # ###############################################
     # STRUCTURE DATA
     # ###############################################
-    if len(cells) > 0:
-        for i in range(len(cells) - 1):
-            print(cells[i], texts[i], sep=" : ")
+    # if len(cells) > 0:
+    #     for i in range(len(cells) - 1):
+    #         print(cells[i], texts[i], sep=" : ")
             # c = cells[i]
             # if str(c) in data:
             #     data[str(c)].append(texts[i])
