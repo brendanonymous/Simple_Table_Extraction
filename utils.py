@@ -19,41 +19,34 @@ def run_tesseract(image, psm, oem):
 
 
 
-def extractTableLines(image):
+def extractTableLines(image, horizontal_kernel_size, vertical_kernel_size):
     """EXTRACTS HORIZONTAL AND VERTICAL TABLE LINES FROM AN IMAGE"""
     horizontal_lines = np.copy(image)
     vertical_lines = np.copy(image)
 
     # get horizontal lines
-    cols = horizontal_lines.shape[1]
-    
-    horizontal_lines_size = cols // 30
+    k = np.ones((1, horizontal_kernel_size), np.uint8)
 
-    print ("horiz size", horizontal_lines_size)
-
-    horizontal_kernel = cv.getStructuringElement(cv.MORPH_RECT, (horizontal_lines_size, 1))
-
-
-    horizontal_lines = cv.erode(horizontal_lines, horizontal_kernel)
-    horizontal_lines = cv.dilate(horizontal_lines, horizontal_kernel)
-
-    showImage(horizontal_lines, "h lines")
-
+    horizontal_lines = cv.erode(horizontal_lines, k)
+    horizontal_lines = cv.dilate(horizontal_lines, k)
 
     # get vertical lines
-    rows = vertical_lines.shape[0]
-    vertical_lines_size = rows // 30
+    k = np.ones((vertical_kernel_size, 1), np.uint8)
 
-    print ("vert size", vertical_lines_size)
-
-    vertical_kernel = cv.getStructuringElement(cv.MORPH_RECT, (1, vertical_lines_size))
-
-    vertical_lines = cv.erode(vertical_lines, vertical_kernel)
-    vertical_lines = cv.dilate(vertical_lines, vertical_kernel)
-
-    showImage(vertical_lines, "v lines")
+    vertical_lines = cv.erode(vertical_lines, k)
+    vertical_lines = cv.dilate(vertical_lines, k)
 
     return horizontal_lines, vertical_lines
+
+
+
+def extractNonTableData(image, contours):
+    text_only = image
+    if len(contours) != 0:
+        x, y, w, h = cv.boundingRect(contours[0])
+        cv.rectangle(text_only, (x, y), (x + w, y + h), (255, 255, 255), cv.FILLED)
+
+    return run_tesseract(text_only, 3, 3)
 
 
 
@@ -76,9 +69,12 @@ def showImage(image, title, scalePercent=100):
 
 
 
-def drawThing():
+def drawLine(size):
     canvas = np.zeros((4135, 5847, 3), np.uint8)
-    cv.line(canvas, (20, 20), (20, 50), (0, 255, 0), 2)
+    y = 20
+    x = 20
+    cv.line(canvas, (y, x), (y + size, x), (0, 255, 0), 2)
+    cv.line(canvas, (y, x), (y, x + size), (0, 255, 0), 2)
     showImage(canvas, "thing")
 
 
@@ -86,7 +82,7 @@ def drawThing():
 def showContours(contours, scalePercent=100):
     """SHOW CONTOURS FOR DEBUGGING"""
     contours_image = np.zeros((4135,5847,3), np.uint8)
-    cv.drawContours(contours_image, contours, -1, (0,255,0), 2)
+    cv.drawContours(contours_image, contours, -1, (97, 204, 44), 2) 
     showImage(contours_image, "contours", scalePercent)
 
 
@@ -95,13 +91,13 @@ def showContoursIter(contours, scalePercent=100, reverse=False):
     """SHOW CONTOURS ITERATIVELY ON A BLACK CANVAS FOR DEBUGGING"""
     contours_image = np.zeros((4135,5847,3), np.uint8)
     if reverse:
-            for i in range(len(contours) - 1, -1, -1):
-                cv.drawContours(contours_image, contours, i, (0,255,0), 2)
-                showImage(contours_image, "Contours", scalePercent)
+        for i in range(len(contours) - 1, -1, -1):
+            cv.drawContours(contours_image, contours, i, (0,255,0), 2)
+            showImage(contours_image, "Contours", scalePercent)
     else:
-            for i in range(len(contours)):
-                cv.drawContours(contours_image, contours, i, (0, 255, 0), 2)
-                showImage(contours_image, "Contours", scalePercent)
+        for i in range(len(contours)):
+            cv.drawContours(contours_image, contours, i, (0, 255, 0), 2)
+            showImage(contours_image, "Contours", scalePercent)
 
 
 
