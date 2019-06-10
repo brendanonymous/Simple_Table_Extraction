@@ -38,9 +38,10 @@ def getMSEntTable1(original_image):
 
     utils.showImage(line_mask, "table lines", 70) ## DEBUG
 
-    (contours, _) = cv.findContours(line_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    (contours, _) = cv.findContours(line_mask, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
     
-    utils.showContours(contours, 70) ## DEBUG
+    utils.showContoursIter(contours, 70) ## DEBUG
+    exit()
 
 
     # ###############################################
@@ -56,7 +57,7 @@ def getMSEntTable1(original_image):
         if cv.mean(box)[0] < 155: # detect headers for specific table style
             _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
         cells.append([x, y, w, h])
-        # texts.append(utils.run_tesseract(box, 3, 3)) # OCR w/in bounding box
+        texts.append(utils.run_tesseract(box, 3, 3)) # OCR w/in bounding box
 
 
     # #############################################
@@ -70,7 +71,7 @@ def getMSEntTable1(original_image):
     # ###############################################
     if len(cells) > 0:
         for i in range(len(cells) - 1):
-            print (cells[i])
+            print(cells[i], texts[i], sep=" : ")
             # c = cells[i]
             # if str(c) in data:
             #     data[str(c)].append(texts[i])
@@ -79,7 +80,7 @@ def getMSEntTable1(original_image):
             # else:
             #     data[str(c)] = [texts[i]]
 
-    data["non-table data"] = texts[-1] # non tabular data
+    # data["non-table data"] = texts[-1] # non tabular data
 
     json_data = json.dumps(data, indent=3)
 
