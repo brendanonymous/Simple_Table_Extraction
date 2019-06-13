@@ -1,4 +1,5 @@
 import cv2 as cv
+import debug
 import json
 import utils
 
@@ -10,7 +11,7 @@ def getMSEntTable1(original_image):
     original_image = cv.resize(original_image, (int(original_image.shape[1] * 0.2), int(original_image.shape[0]*0.2)), interpolation = cv.INTER_AREA)
     gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
 
-    utils.showImage(gray_image, "original grayscale image", 70) ## DEBUG
+    debug.showImage(gray_image, "original grayscale image", 70) ## DEBUG
 
 
     ###############################################
@@ -19,7 +20,7 @@ def getMSEntTable1(original_image):
     threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
     threshold = cv.bitwise_not(threshold)
 
-    utils.showImage(threshold, "image with applied threshold", 70) ## DEBUG
+    debug.showImage(threshold, "image with applied threshold", 70) ## DEBUG
 
 
     ###############################################
@@ -32,384 +33,70 @@ def getMSEntTable1(original_image):
     # CREATE LINE MASK AND FIND EXTERNAL CONTOURS
     ###############################################
     line_mask = horizontal + vertical
+    debug.showImage(line_mask, "table lines", 70) ## DEBUG
 
-    utils.showImage(line_mask, "table lines", 70) ## DEBUG
-
-    table_outline_contours, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
-    
-    utils.showContours(table_outline_contours, 70) ## DEBUG
+    table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines    
+    debug.showContours(table_ctrs, 70) ## DEBUG
 
 
     # ###############################################
-    # EXTRACT TABLES AND OCR
+    # EXTRACT TABLES AND INDIVIDUAL CELLS AND OCR
     # ###############################################
     texts = []
     cells = []
     data = {}
+    table_num = 1
 
-    # for each table outline contour, get inner contours then perform OCR
-    for table_outline in table_outline_contours:
-        x, y, w, h = cv.boundingRect(table_outline) # get contour coordinates
-        box = gray_image[y - 1:y + h + 1, x - 1:x + w + 1] # get bounding box (slightly enlarged)
-        box = cv.bitwise_not(cv.adaptiveThreshold(box, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)) # threshold
-        h, v = utils.extractTableLines(box, 150, 30) # get lines
-        cell_cntrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get lines
-        for i in range(len(cell_cntrs) - 2, -1, -1):
-            x, y, w, h = cv.boundingRect(cell_cntrs[i])
-            box = gray_image[y:y + h, x:x + w]
-            if cv.mean(box)[0] < 155: # detect headers for specific table style
-                _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
-            # structure data and OCR
+    table_ctrs = utils.sortContours(table_ctrs, cv.boundingRect(line_mask)[2])
+    debug.showContoursIter(table_ctrs, 80) ## DEBUG
 
+    # for each table outline contour, get cell contours then perform OCR
+    for table_ctr in table_ctrs:
+        x, y, w, h = cv.boundingRect(table_ctr)
+        table_bbox = gray_image[y - 1:y + h + 1, x - 1:x + w + 1]
 
+        cell_ctrs = utils.getCellContours(table_bbox, w)
+        
+        key = "table {}".format(table_num)
+        data[key] = []
+        visited_r = []
+        visited_c = []
 
+        for cell_ctr in cell_ctrs:
+            x, y, w, h = cv.boundingRect(cell_ctr)
+            cell_bbox = table_bbox[y:y + h, x:x + w]
 
-        # if cv.mean(box)[0] < 155: # detect headers for specific table style
-        #     _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
-        # cells.append([x, y, w, h])
-        # texts.append(utils.run_tesseract(box, 3, 3)) # OCR w/in bounding box
+            # detect headers for specific table style
+            if cv.mean(cell_bbox)[0] < 155:
+                _, cell_bbox = cv.threshold(cell_bbox, 200, 255, cv.THRESH_BINARY_INV)
+
+            # logic to differentiate different rows and cells
+            if y not in visited_r:
+                visited_r.append(y)
+            
+            if x not in visited_c:
+                visited_c.append(x)
+
+            # signifiy if OCR returned empty string
+            v = utils.run_tesseract(cell_bbox, 3, 3)
+            if v == "":
+                v = "NULL"
+
+            data[key].append((visited_r.index(y) + 1, visited_c.index(x) + 1, v))
+
+        table_num += 1
 
 
     # #############################################
-    # EXTRACT NON TABLE DATA AND OCR
+    # GET NON TABLE DATA
     # #############################################
-    # texts.append(utils.extractNonTableData(gray_image, contours))
+    data["non-tabular data"] = utils.getNonTabularData(gray_image, table_ctrs)
 
 
-    # ###############################################
-    # STRUCTURE DATA
-    # ###############################################
-    # if len(cells) > 0:
-    #     for i in range(len(cells) - 1):
-    #         print(cells[i], texts[i], sep=" : ")
-            # c = cells[i]
-            # if str(c) in data:
-            #     data[str(c)].append(texts[i])
-            # elif str((c[0], c[1] + 1)) in data:
-            #     data[str((c[0], c[1] + 1))].append(texts[i])
-            # else:
-            #     data[str(c)] = [texts[i]]
-
-    # data["non-table data"] = texts[-1] # non tabular data
-
+    # #############################################
+    # FORMAT JSON
+    # #############################################
     json_data = json.dumps(data, indent=3)
 
     print(json_data)
 
-
-
-def getMSEntTable2(original_image):    
-    """GET SECOND TABLE FROM MS ENTERPRISE SWO DOC AND BUILD JSON STRUCTURE"""
-    ###################################
-    # CONVERT COLORSPACE TO NEGATIVE
-    ###################################
-    original_image = cv.resize(original_image, (int(original_image.shape[1] * 0.2), int(original_image.shape[0]*0.2)), interpolation = cv.INTER_AREA)
-    gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
-
-    utils.showImage(gray_image, "original grayscale image", 70) ## DEBUG
-
-
-    ###############################################
-    # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
-    ###############################################
-    threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 1)    
-    threshold = cv.bitwise_not(threshold) # negative
-
-    utils.showImage(threshold, "image with applied threshold", 70) ## DEBUG
-
-
-    ###############################################
-    # EXTRACT TABLE LINES
-    ###############################################
-    horizontal, vertical = utils.extractTableLines(threshold, 340, 30)
-
-    utils.showImage(horizontal, "horizontal lines", 70) ## DEBUG
-    utils.showImage(vertical, "vertical lines", 70) ## DEBUG
-
-
-    ###############################################
-    # CREATE LINE MASK AND FIND CONTOURS
-    ###############################################
-    line_mask = horizontal + vertical
-
-    utils.showImage(line_mask, "table lines", 70) ## DEBUG
-
-    (contours, _) = cv.findContours(line_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    
-    utils.showContours(contours, 70) ## DEBUG
-
-
-    # ###############################################
-    # EXTRACT TABLE AND OCR
-    # ###############################################
-    texts = []
-    cells = []
-    data = {}
-
-    for i in range(len(contours) - 1, 0, -1):
-        x, y, w, h = cv.boundingRect(contours[i]) # get contour coordinates
-        box = gray_image[y:y + h, x:x + w] # get bounding box
-        if cv.mean(box)[0] < 155: # this will detect headers for this style of table
-            _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
-        cells.append((x,y))
-        texts.append(utils.run_tesseract(box, 3, 3)) # extract text from bounding box with Tesseract
-
-
-    # #############################################
-    # EXTRACT NON TABLE DATA AND OCR
-    # #############################################
-    texts.append(utils.extractNonTableData(gray_image, contours))
-
-
-    # ###############################################
-    # STRUCTURE DATA
-    # ###############################################
-    if len(cells) > 0:
-        data[str(cells[0])] = [texts[0]]
-        for i in range(1, len(cells) - 1):
-            data[str(cells[0])].append(texts[i])
-
-    data["non-table data"] = texts[-1] # add the non-table data
-
-    json_data = json.dumps(data, indent=3)
-
-    print(json_data)
-
-
-
-def getMSEntTable3(original_image):
-    """GET THIRD TABLE FROM MS ENTERPRISE SWO DOC AND BUILD JSON STRUCTURE"""
-    ###############################################
-    # CONVERT COLORSPACE TO NEGATIVE
-    ###############################################
-    original_image = cv.resize(original_image, (int(original_image.shape[1] * 0.2), int(original_image.shape[0]*0.2)), interpolation = cv.INTER_AREA)
-    gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
-
-    utils.showImage(gray_image, "original grayscale image", 70) ## DEBUG
-
-
-    ###############################################
-    # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
-    ###############################################
-    threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 1)    
-    threshold = cv.bitwise_not(threshold) # negative
-
-    utils.showImage(threshold, "image with applied threshold", 70) ## DEBUG
-
-
-    ###############################################
-    # EXTRACT TABLE LINES
-    ###############################################
-    horizontal, vertical = utils.extractTableLines(threshold, 150, 50)
-
-    utils.showImage(horizontal, "horizontal lines", 70) ## DEBUG
-    utils.showImage(vertical, "vertical lines", 70) ## DEBUG
-
-
-    ###############################################
-    # CREATE LINE MASK AND FIND CONTOURS
-    ###############################################
-    line_mask = horizontal + vertical
-
-    utils.showImage(line_mask, "table lines", 70) ## DEBUG
-
-    (contours, _) = cv.findContours(line_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    
-    utils.showContours(contours, 70) ## DEBUG
-
-
-    # ###############################################
-    # EXTRACT TABLE AND OCR
-    # ###############################################
-    texts = []
-    cells = []
-    data = {}
-
-    for i in range(len(contours) - 1, -1, -1):
-        x, y, w, h = cv.boundingRect(contours[i]) # get contour coordinates
-        box = gray_image[y:y + h, x:x + w] # get bounding box
-        if cv.mean(box)[0] < 155: # this will detect headers for this style of table
-            _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)       
-        cells.append([x,w])
-        texts.append(utils.run_tesseract(box, 3, 3)) # extract text from bounding box with Tesseract
-
-
-    # #############################################
-    # EXTRACT NON TABLE DATA AND OCR
-    # #############################################
-    texts.append(utils.extractNonTableData(gray_image, contours))
-
-    
-    # ###############################################
-    # STRUCTURE DATA
-    # ###############################################
-    if len(cells) > 0:
-        for i in range(len(cells) - 1):
-            c = cells[i]
-            if c[1] in list(range(107, 112)):
-                c[1] = 109
-            c = tuple(c)
-            if str(c) in data:
-                data[str(c)].append(texts[i])
-            else:
-                data[str(c)] = [texts[i]]
-    
-    data["non-table data"] = texts[-1] # add the non-table data
-
-    json_data = json.dumps(data, indent=3)
-
-    print(json_data)
-
-
- 
-
-
-
-
-
-
-
-
-
-
-
-# def getSample4Table1(original_image):
-#     """GET TABLE 1 FROM SAMPLE 4.pdf DOC AND BUILD JSON STRUCTURE"""
-#     ###################################
-#     # CONVERT COLORSPACE TO NEGATIVE
-#     ###################################
-#     original_image = cv.resize(original_image, (int(original_image.shape[1] * 0.2), int(original_image.shape[0]*0.2)), interpolation = cv.INTER_AREA)
-#     gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
-
-
-#     ###############################################
-#     # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
-#     ###############################################
-#     threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 1)    
-#     threshold = cv.bitwise_not(threshold) # negative
-
-
-#     ###############################################
-#     # EXTRACT TABLE LINES
-#     ###############################################
-#     horizontal, vertical = utils.extractTableLines(threshold, 340, 30)
-
-
-#     ###############################################
-#     # CREATE LINE MASK AND FIND CONTOURS
-#     ###############################################
-#     line_mask = horizontal + vertical
-
-#     (contours, _) = cv.findContours(line_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-
-
-#     # ###############################################
-#     # EXTRACT TABLE AND OCR
-#     # ###############################################
-#     texts = []
-#     cells = []
-#     data = {}
-
-#     for i in range(len(contours) - 1, -1, -1):
-#         x, y, w, h = cv.boundingRect(contours[i]) # get contour coordinates
-#         box = gray_image[y:y + h, x:x + w] # get bounding box
-#         if cv.mean(box)[0] < 155: # this will detect headers for this style of table
-#             _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
-#         cells.append((x,w))
-#         texts.append(utils.run_tesseract(box, 3, 3)) # extract text from bounding box with Tesseract
-
-
-#     # #############################################
-#     # EXTRACT NON TABLE DATA AND OCR
-#     # #############################################
-#     texts.append(utils.extractNonTableData(gray_image, contours))
-
-    
-    # # ###############################################
-    # # STRUCTURE DATA
-    # # ###############################################
-    # if len(cells) > 0:
-    #     for i in range(len(cells) - 1):
-    #         c = cells[i]
-    #         if str(c) in data:
-    #             data[str(c)].append(texts[i])
-    #         else:
-    #             data[str(c)] = [texts[i]]
-
-#     data["non-table data"] = texts[-1]
-
-#     json_data = json.dumps(data, indent=3)
-
-#     print(json_data)
-
-
-
-# def getSample7Table1(original_image):
-    # """GET TABLE 1 FROM SAMPLE 7.pdf DOC AND BUILD JSON STRUCTURE"""
-    # ###################################
-    # # CONVERT COLORSPACE TO NEGATIVE
-    # ###################################
-    # original_image = cv.resize(original_image, (int(original_image.shape[1] * 0.2), int(original_image.shape[0]*0.2)), interpolation = cv.INTER_AREA)
-    # gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
-
-
-    # ###############################################
-    # # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
-    # ###############################################
-    # threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 1)    
-    # threshold = cv.bitwise_not(threshold) # negative
-
-
-    # ###############################################
-    # # EXTRACT TABLE LINES
-    # ###############################################    
-    # horizontal, vertical = utils.extractTableLines(threshold, 340, 30)
-
-
-    # ###############################################
-    # # CREATE LINE MASK AND FIND CONTOURS
-    # ###############################################
-    # line_mask = horizontal + vertical
-
-    # (contours, _) = cv.findContours(line_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-
-
-    # # ###############################################
-    # # EXTRACT TABLE AND OCR
-    # # ###############################################
-    # texts = []
-    # cells = []
-    # data = {}
-
-    # for i in range(len(contours) - 1, -1, -1):
-    #     x, y, w, h = cv.boundingRect(contours[i]) # get contour coordinates
-    #     box = gray_image[y:y + h, x:x + w] # get bounding box
-    #     if cv.mean(box)[0] < 155:
-    #         _, box = cv.threshold(box, 200, 255, cv.THRESH_BINARY_INV)
-    #     cells.append((x,w))
-    #     texts.append(utils.run_tesseract(box, 3, 3)) # extract text from bounding box with Tesseract
-
-    
-    # # #############################################
-    # # EXTRACT NON TABLE DATA AND OCR
-    # # #############################################
-    # texts.append(utils.extractNonTableData(gray_image, contours))
-
-
-    # # ###############################################
-    # # STRUCTURE DATA
-    # # ###############################################
-    # if len(cells) > 0:
-    #   for i in range(len(cells) - 1):
-    #       c = cells[i]
-    #       print (c)
-    #       if str(c) in data:
-    #            data[str(c)].append(texts[i])
-    #       else:
-    #           data[str(c)] = [texts[i]]
-
-    # data["non-table data"] = texts[-1]
-
-    # json_data = json.dumps(data, indent=3)
-
-    # print(json_data)

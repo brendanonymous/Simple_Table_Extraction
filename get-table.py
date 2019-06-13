@@ -17,44 +17,10 @@ if __name__ == "__main__":
         if imagePath[-4:] == ".pdf":
             _ = utils.pdfToJpg(imagePath)
             # get table 1 from Sample 1.pdf
-            img = cv.imread("out1.jpg")
+            img = cv.imread("out2.jpg")
             main.getMSEntTable1(img)
 
-            # get table 2 from Sample 1.pdf
-            # img = cv.imread("out2.jpg")
-            # main.getMSEntTable2(img)
 
-            # # get table 3 from Sample 1.pdf
-            # img = cv.imread("out3.jpg")
-            # main.getMSEntTable3(img)
-
-            # # get table 4 from Sample 1.pdf
-            # img = cv.imread("out4.jpg")
-            # main.getMSEntTable2(img)
-
-            # # get table 5 from Sample 1.pdf
-            # img = cv.imread("out5.jpg")
-            # main.getMSEntTable2(img)
-
-            # # get table 6 from Sample 1.pdf
-            # img = cv.imread("out6.jpg")
-            # main.getMSEntTable2(img)
-
-
-
-            # # get table 1 from sample 4.pdf
-            # img = cv.imread("out1.jpg")
-            # main.getSample4Table1(img)
-
-            # get page 2 from sample 4.pdf
-            # img = cv.imread("out2.jpg")
-            # main.getSample4Table1(img)
-
-
-
-            # # get tables from page 1 of sample 7.pdf # THIS ONE IS IN DEVELOPMENT
-            # img = cv.imread("out1.jpg")
-            # main.getSample7Table1(img)
         else:
             print("Error: file must be in PDF format")
     else:

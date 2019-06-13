@@ -40,76 +40,37 @@ def extractTableLines(image, horizontal_kernel_size, vertical_kernel_size):
 
 
 
-def extractNonTableData(image, contours):
+def getNonTabularData(image, table_outline_ctrs):
+    """EXTRACTS ALL DATA NOT IN TABLE"""
     text_only = image
-    if len(contours) != 0:
-        x, y, w, h = cv.boundingRect(contours[0])
+
+    # draw white rectangles on image
+    for table_outline in table_outline_ctrs:
+        x, y, w, h = cv.boundingRect(table_outline)
         cv.rectangle(text_only, (x, y), (x + w, y + h), (255, 255, 255), cv.FILLED)
 
     return run_tesseract(text_only, 3, 3)
 
 
 
-def showImageHelper(image, title):
-    """SHOW IMAGE FOR DEBUGGING"""
-    cv.imshow(title, image)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+def getCellContours(table_bbox, w):
+    """RETURNS TABLE OUTLINE BOUNDING BOX AND CELL CONTOURS"""
+    table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
+    table_bbox = cv.bitwise_not(table_bbox)
+
+    h, v = extractTableLines(table_bbox, w - 10, 30) # get lines        
+    cell_ctrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get cell contours
+
+    return sortContours(cell_ctrs[1:], w)
 
 
 
-def showImage(image, title, scalePercent=100):
-    """RESIZE IMAGE THEN SHOW FOR DEBUGGING"""
-    newWidth = int(image.shape[1] * scalePercent / 100)
-    newHeight = int(image.shape[0] * scalePercent / 100)
-    dimension = (newWidth, newHeight)
-    resizedImage = cv.resize(image, dimension, interpolation=cv.INTER_AREA)
-
-    showImageHelper(resizedImage, title)
+def sortContours(ctrs, w):
+    """RETURNS LIST OF CONTOURS SORTED LEFT-TO-RIGHT AND TOP-TO-BOTTOM"""
+    return sorted(ctrs, key=lambda c: cv.boundingRect(c)[0] + cv.boundingRect(c)[1] * w )
 
 
 
-def drawLine(size):
-    canvas = np.zeros((4135, 5847, 3), np.uint8)
-    y = 20
-    x = 20
-    cv.line(canvas, (y, x), (y + size, x), (0, 255, 0), 2)
-    cv.line(canvas, (y, x), (y, x + size), (0, 255, 0), 2)
-    showImage(canvas, "thing")
-
-
-
-def showContours(contours, scalePercent=100):
-    """SHOW CONTOURS FOR DEBUGGING"""
-    contours_image = np.zeros((4135,5847,3), np.uint8)
-    cv.drawContours(contours_image, contours, -1, (97, 204, 44), 2) 
-    showImage(contours_image, "contours", scalePercent)
-
-
-
-def showContoursIter(contours, scalePercent=100, reverse=False):
-    """SHOW CONTOURS ITERATIVELY ON A BLACK CANVAS FOR DEBUGGING"""
-    contours_image = np.zeros((4135,5847,3), np.uint8)
-    if reverse:
-        for i in range(len(contours) - 1, -1, -1):
-            cv.drawContours(contours_image, contours, i, (0,255,0), 2)
-            showImage(contours_image, "Contours", scalePercent)
-    else:
-        for i in range(len(contours)):
-            cv.drawContours(contours_image, contours, i, (0, 255, 0), 2)
-            showImage(contours_image, "Contours", scalePercent)
-
-
-
-def showContoursOnImage(contours, image, scalePercent=100):
-    """SHOW CONTOURS ITERATIVELY ON IMAGE FOR DEBUGGING"""
-    for i in range(len(contours) - 1, -1, -1):
-        img = image
-        cv.drawContours(img, contours, i, (0, 0, 255), 1)
-        showImage(img, "image with contour", scalePercent)
-
-
-# convert pdf to image
 def pdfToJpg(path):
     """CONVERT PDF TO IMAGE, SAVE, AND RETURN NUMBER OF PAGES"""
     pages = convert_from_path(path, 500)
