@@ -5,13 +5,16 @@ import utils
 
 def getData_1(original_image):
     """GET FIRST TABLE FROM MS ENTERPRISE SWO DOC AND BUILD JSON STRUCTURE"""
+    #"""int(original_image.shape[1] * 0.2), int(original_image.shape[0] * 0.2)"""
     ###############################################
     # CONVERT COLORSPACE TO NEGATIVE
     ###############################################
-    original_image = cv.resize(original_image, (int(original_image.shape[1] * 0.2), int(original_image.shape[0]*0.2)), interpolation = cv.INTER_AREA)
+    original_image = cv.resize(original_image, (830, 1170), interpolation = cv.INTER_AREA) # might have a lot of overhead depending on img size
+    # print ("RESIZED: w: {}, h: {}".format(original_image.shape[1], original_image.shape[0]))
     gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
 
-    debug.showImage(gray_image, "original grayscale image", 70) ## DEBUG
+    debug.showImage(gray_image, "original grayscale image") ## DEBUG
+    # exit()
 
 
     ###############################################
@@ -20,7 +23,7 @@ def getData_1(original_image):
     threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
     threshold = cv.bitwise_not(threshold)
 
-    debug.showImage(threshold, "image with applied threshold", 70) ## DEBUG
+    debug.showImage(threshold, "image with applied threshold") ## DEBUG
 
 
     ###############################################
@@ -33,12 +36,12 @@ def getData_1(original_image):
     # CREATE LINE MASK AND FIND EXTERNAL CONTOURS
     ###############################################
     line_mask = horizontal + vertical
-    debug.showImage(line_mask, "table lines", 70) ## DEBUG
+    debug.showImage(line_mask, "table lines") ## DEBUG
 
     table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
 
     table_ctrs = utils.removeFlatContours(table_ctrs)
-    debug.showContours(table_ctrs, "table outline contours", 70) ## DEBUG
+    debug.showContours(table_ctrs, "table outline contours") ## DEBUG
 
 
     # ###############################################
@@ -50,7 +53,7 @@ def getData_1(original_image):
     table_num = 1
 
     table_ctrs = utils.sortContours(table_ctrs, cv.boundingRect(line_mask)[2])
-    debug.showContoursIter(table_ctrs, 80) ## DEBUG
+    debug.showContoursIter(table_ctrs) ## DEBUG
 
     # for each table outline contour, get cell contours then perform OCR
     for table_ctr in table_ctrs:
