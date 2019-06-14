@@ -65,6 +65,12 @@ def getCellContours(table_bbox, w):
 
 
 
+def removeFlatContours(ctrs):
+    """REMOVES FLAT CONTOURS FROM CONTOUR LIST"""
+    return [ctr for ctr in ctrs if cv.boundingRect(ctr)[3] >= 10]
+
+
+
 def sortContours(ctrs, w):
     """RETURNS LIST OF CONTOURS SORTED LEFT-TO-RIGHT AND TOP-TO-BOTTOM"""
     return sorted(ctrs, key=lambda c: cv.boundingRect(c)[0] + cv.boundingRect(c)[1] * w )

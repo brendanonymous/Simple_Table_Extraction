@@ -35,7 +35,9 @@ def getData_1(original_image):
     line_mask = horizontal + vertical
     debug.showImage(line_mask, "table lines", 70) ## DEBUG
 
-    table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines    
+    table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
+
+    table_ctrs = utils.removeFlatContours(table_ctrs)
     debug.showContours(table_ctrs, "table outline contours", 70) ## DEBUG
 
 
@@ -71,7 +73,7 @@ def getData_1(original_image):
                 _, cell_bbox = cv.threshold(cell_bbox, 200, 255, cv.THRESH_BINARY_INV)
 
             # logic to differentiate different rows and cells
-            if y not in visited_rows: #data[key]
+            if y not in visited_rows:
                 visited_rows.append(y)
                 row += 1                
                 col = 1
