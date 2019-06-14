@@ -3,7 +3,7 @@ import debug
 import json
 import utils
 
-def getMSEntTable1(original_image):
+def getData_1(original_image):
     """GET FIRST TABLE FROM MS ENTERPRISE SWO DOC AND BUILD JSON STRUCTURE"""
     ###############################################
     # CONVERT COLORSPACE TO NEGATIVE
@@ -36,7 +36,7 @@ def getMSEntTable1(original_image):
     debug.showImage(line_mask, "table lines", 70) ## DEBUG
 
     table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines    
-    debug.showContours(table_ctrs, 70) ## DEBUG
+    debug.showContours(table_ctrs, "table outline contours", 70) ## DEBUG
 
 
     # ###############################################
@@ -58,9 +58,9 @@ def getMSEntTable1(original_image):
         cell_ctrs = utils.getCellContours(table_bbox, w)
         
         key = "table {}".format(table_num)
-        data[key] = []
-        visited_r = []
-        visited_c = []
+        data[key] = {}
+        visited_rows = []
+        row = 0
 
         for cell_ctr in cell_ctrs:
             x, y, w, h = cv.boundingRect(cell_ctr)
@@ -71,18 +71,20 @@ def getMSEntTable1(original_image):
                 _, cell_bbox = cv.threshold(cell_bbox, 200, 255, cv.THRESH_BINARY_INV)
 
             # logic to differentiate different rows and cells
-            if y not in visited_r:
-                visited_r.append(y)
-            
-            if x not in visited_c:
-                visited_c.append(x)
+            if y not in visited_rows: #data[key]
+                visited_rows.append(y)
+                row += 1                
+                col = 1
+                data[key]["row " + str(row)] = []
+            else:
+                col += 1
 
             # signifiy if OCR returned empty string
             v = utils.run_tesseract(cell_bbox, 3, 3)
             if v == "":
                 v = "NULL"
 
-            data[key].append((visited_r.index(y) + 1, visited_c.index(x) + 1, v))
+            data[key]["row " + str(row)].append(("col " + str(col), v))
 
         table_num += 1
 
@@ -96,7 +98,7 @@ def getMSEntTable1(original_image):
     # #############################################
     # FORMAT JSON
     # #############################################
-    json_data = json.dumps(data, indent=3)
+    json_data = json.dumps(data, indent=3, ensure_ascii=False)
 
     print(json_data)
 

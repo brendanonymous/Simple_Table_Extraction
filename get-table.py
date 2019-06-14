@@ -15,12 +15,10 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         imagePath = sys.argv[1]
         if imagePath[-4:] == ".pdf":
-            _ = utils.pdfToJpg(imagePath)
-            # get table 1 from Sample 1.pdf
-            img = cv.imread("out2.jpg")
-            main.getMSEntTable1(img)
-
-
+            num_pages = utils.pdfToJpg(imagePath)
+            for i in range(num_pages):
+                img = cv.imread("out{}.jpg".format(i + 1))
+                main.getData_1(img)
         else:
             print("Error: file must be in PDF format")
     else:

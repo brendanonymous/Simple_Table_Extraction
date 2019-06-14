@@ -31,11 +31,11 @@ def drawLine(size):
 
 
 
-def showContours(contours, scalePercent=100):
+def showContours(contours, title="Contours", scalePercent=100):
     """SHOW CONTOURS FOR DEBUGGING"""
     contours_image = np.zeros((4135,5847,3), np.uint8)
     cv.drawContours(contours_image, contours, -1, (97, 204, 44), 2) 
-    showImage(contours_image, "contours", scalePercent)
+    showImage(contours_image, title, scalePercent)
 
 
 
