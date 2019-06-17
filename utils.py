@@ -1,9 +1,7 @@
-
 import cv2 as cv
 import numpy as np
 from pdf2image import convert_from_path
 import pytesseract as tess
-
 
 
 def run_tesseract(image, psm, oem):
@@ -14,75 +12,71 @@ def run_tesseract(image, psm, oem):
     # Run tesseract
     text = tess.image_to_string(image, lang=language, config=configuration)
     if len(text.strip()) == 0:
-        configuration += " -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        configuration += " -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-."
         text = tess.image_to_string(image, lang=language, config=configuration)
 
     return text
 
 
 
-def extractTableLines(image):
+def extractTableLines(image, horizontal_kernel_size, vertical_kernel_size):
     """EXTRACTS HORIZONTAL AND VERTICAL TABLE LINES FROM AN IMAGE"""
     horizontal_lines = np.copy(image)
     vertical_lines = np.copy(image)
 
     # get horizontal lines
-    cols = horizontal_lines.shape[1]
-    horizontal_lines_size = cols // 30
+    k = np.ones((1, horizontal_kernel_size), np.uint8)
 
-    horizontal_kernel = cv.getStructuringElement(cv.MORPH_RECT, (horizontal_lines_size, 1))
-
-    horizontal_lines = cv.erode(horizontal_lines, horizontal_kernel)
-    horizontal_lines = cv.dilate(horizontal_lines, horizontal_kernel)
+    horizontal_lines = cv.erode(horizontal_lines, k)
+    horizontal_lines = cv.dilate(horizontal_lines, k)
 
     # get vertical lines
-    rows = vertical_lines.shape[0]
-    vertical_lines_size = rows // 30
+    k = np.ones((vertical_kernel_size, 1), np.uint8)
 
-    vertical_kernel = cv.getStructuringElement(cv.MORPH_RECT, (1, vertical_lines_size))
-    
-    vertical_lines = cv.erode(vertical_lines, vertical_kernel)    
-    vertical_lines = cv.dilate(vertical_lines, vertical_kernel)
+    vertical_lines = cv.erode(vertical_lines, k)
+    vertical_lines = cv.dilate(vertical_lines, k)
 
     return horizontal_lines, vertical_lines
 
 
 
-def showImage(image, title):
-    """SHOW IMAGE FOR DEBUGGING"""
-    cv.imshow(title, image)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+def getNonTabularData(image, table_outline_ctrs):
+    """EXTRACTS ALL DATA NOT IN TABLE"""
+    text_only = image
+
+    # draw white rectangles on image
+    for table_outline in table_outline_ctrs:
+        x, y, w, h = cv.boundingRect(table_outline)
+        cv.rectangle(text_only, (x, y), (x + w, y + h), (255, 255, 255), cv.FILLED)
+
+    return run_tesseract(text_only, 3, 3)
 
 
 
-def showContours(contours):
-    """SHOW CONTOURS FOR DEBUGGING"""
-    contours_image = np.zeros((720,1280,3), np.uint8)
-    cv.drawContours(contours_image, contours, -1, (0,255,0), 2)
-    showImage(contours_image, "contours")
+def getCellContours(table_bbox, w):
+    """RETURNS TABLE OUTLINE BOUNDING BOX AND CELL CONTOURS"""
+    table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
+    table_bbox = cv.bitwise_not(table_bbox)
+
+    h, v = extractTableLines(table_bbox, w - 10, 30) # get lines        
+    cell_ctrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get cell contours
+
+    return sortContours(cell_ctrs[1:], w)
 
 
 
-def showContoursOnImage(contours, image):
-    """SHOW CONTOURS ITERATIVELY ON IMAGE FOR DEBUGGING"""
-    for i in range(len(contours) - 1, -1, -1):
-        img = image
-        cv.drawContours(img, contours, i, (0, 0, 255), 1)
-        showImage(img, "image with contour")
+def removeFlatContours(ctrs):
+    """REMOVES FLAT CONTOURS FROM CONTOUR LIST"""
+    return [ctr for ctr in ctrs if cv.boundingRect(ctr)[3] >= 10]
 
 
 
-def showContoursIter(contours):
-    """SHOW CONTOURS ITERATIVELY ON A BLACK CANVAS FOR DEBUGGING"""
-    contours_image = np.zeros((720,1280,3), np.uint8)
-    for i in range(len(contours) - 1, -1, -1):
-        cv.drawContours(contours_image, contours, i, (0,255,0), 2)
-        showImage(contours_image, "Contours")
+def sortContours(ctrs, w):
+    """RETURNS LIST OF CONTOURS SORTED LEFT-TO-RIGHT AND TOP-TO-BOTTOM"""
+    return sorted(ctrs, key=lambda c: cv.boundingRect(c)[0] + cv.boundingRect(c)[1] * w )
 
 
 
-# convert pdf to image
 def pdfToJpg(path):
     """CONVERT PDF TO IMAGE, SAVE, AND RETURN NUMBER OF PAGES"""
     pages = convert_from_path(path, 500)

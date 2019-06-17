@@ -1,81 +1,96 @@
 import cv2 as cv
-from openpyxl import Workbook, load_workbook
-import os
+import debug
+import json
 import utils
 
-def getTable(original_image, outputSheetNum):
-    """GET TABLE FROM IMAGE AND WRITE TO EXCEL"""
-    ###################################
+def getData_1(original_image):
+    """GENERIC FUNCTION TO GET TABULAR AND NON TABULAR DATA"""
+    ###############################################
     # CONVERT COLORSPACE TO NEGATIVE
-    ###################################
+    ###############################################
+    original_image = cv.resize(original_image, (830, 1170), interpolation = cv.INTER_AREA) # might have a lot of overhead depending on img size
     gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
 
 
-
-    ###################################
-    # APPLY ADAPTIVE THRESHOLD
-    ###################################
-    gray_image = cv.bitwise_not(gray_image)
-    _, image_withThreshold = cv.threshold(gray_image,127,255,cv.THRESH_BINARY)
-
+    ###############################################
+    # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
+    ###############################################
+    threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
+    threshold = cv.bitwise_not(threshold)
 
 
-    ###################################
+    ###############################################
     # EXTRACT TABLE LINES
-    ###################################
-    horizontal_lines, vertical_lines = utils.extractTableLines(image_withThreshold)
+    ###############################################
+    horizontal, vertical = utils.extractTableLines(threshold, 150, 30)    
 
 
+    ###############################################
+    # CREATE LINE MASK AND FIND EXTERNAL CONTOURS
+    ###############################################
+    line_mask = horizontal + vertical
 
-    ###################################
-    # CREATE LINE MASK AND FIND CONTOURS
-    ################################### 
-    line_mask = horizontal_lines + vertical_lines
-
-    (contours, _) = cv.findContours(line_mask, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
-
-
-
-    ###################################
-    # EXTRACT TABLE AND OCR
-    ###################################
-    x_bounds = set()
-    y_bounds = set()
-    numRows = 0
-    numCols = 0
-    texts = []
-
-    for i in range(len(contours) - 2, -1, -1):
-        x, y, w, h = cv.boundingRect(contours[i]) # get contour coordinates
-        x += 1; w -= 2 # offset HARD CODING, LOL YIKES
-        box = original_image[y:y + h, x:x + w] # get bounding box
-        texts.append(utils.run_tesseract(box, 8, 3)) # extract text from bounding box with Tesseract
-
-        # use bounding box coordinates to track num rows and num cols
-        if x not in x_bounds:
-            x_bounds.add(x)
-            numCols += 1
-        if y not in y_bounds:
-            y_bounds.add(y)
-            numRows += 1
+    table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
+    table_ctrs = utils.removeFlatContours(table_ctrs)
 
 
+    # ###############################################
+    # EXTRACT TABLES AND INDIVIDUAL CELLS AND OCR
+    # ###############################################
+    data = {}
+    table_num = 1
 
-    ###################################
-    # WRITE TABLE TO EXCEL
-    ###################################    
-    if not os.path.exists("test_table.xlsx"): # create new workbook with new sheet
-        workbook = Workbook()
-        worksheet = workbook.active
-        worksheet.title = "table {} from image".format(outputSheetNum)
-    else: # add new sheet
-        workbook = load_workbook("test_table.xlsx")
-        worksheet = workbook.create_sheet("table {} from image".format(outputSheetNum))
+    table_ctrs = utils.sortContours(table_ctrs, cv.boundingRect(line_mask)[2]) # sort contours left-to-right, top-to-bottom
 
-    text_index = 0
-    for Row in range(1, numRows + 1): # double for loop, sue me THERE IS A BETTER WAY TO DO THIS
-        for Col in range(1, numCols + 1):
-            worksheet.cell(row=Row, column=Col).value = texts[text_index]
-            text_index += 1
+    # for each table outline contour, get cell contours then perform OCR
+    for table_ctr in table_ctrs:
+        x, y, w, h = cv.boundingRect(table_ctr)
+        table_bbox = gray_image[y - 1:y + h + 1, x - 1:x + w + 1]
 
-    workbook.save(filename="test_table.xlsx")
+        cell_ctrs = utils.getCellContours(table_bbox, w)
+        
+        key = "table {}".format(table_num)
+        data[key] = {}
+        visited_rows = []
+        row = 0
+
+        for cell_ctr in cell_ctrs:
+            x, y, w, h = cv.boundingRect(cell_ctr)
+            cell_bbox = table_bbox[y:y + h, x:x + w]
+
+            # detect headers for specific table style
+            if cv.mean(cell_bbox)[0] < 155:
+                _, cell_bbox = cv.threshold(cell_bbox, 200, 255, cv.THRESH_BINARY_INV)
+
+            # logic to differentiate different rows and cells
+            if y not in visited_rows:
+                visited_rows.append(y)
+                row += 1                
+                col = 1
+                data[key]["row " + str(row)] = []
+            else:
+                col += 1
+
+            # signifiy if OCR returned empty string
+            v = utils.run_tesseract(cell_bbox, 3, 3)
+            if v == "":
+                v = "NULL"
+
+            data[key]["row " + str(row)].append(("col " + str(col), v))
+
+        table_num += 1
+
+
+    # #############################################
+    # GET NON TABLE DATA
+    # #############################################
+    data["non-tabular data"] = utils.getNonTabularData(gray_image, table_ctrs)
+
+
+    # #############################################
+    # FORMAT JSON
+    # #############################################
+    json_data = json.dumps(data, indent=3, ensure_ascii=False)
+
+    print(json_data)
+
