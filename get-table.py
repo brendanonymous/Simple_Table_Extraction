@@ -18,11 +18,9 @@ if __name__ == "__main__":
             num_pages = utils.pdfToJpg(imagePath)
             for i in range(num_pages):
                 img = cv.imread("out{}.jpg".format(i + 1))
-                print ("w: {}, h: {}".format(img.shape[1], img.shape[0]))
                 main.getData_1(img)
         elif imagePath[-4:] == ".jpg":
             img = cv.imread(imagePath)
-            print ("w: {}, h: {}".format(img.shape[1], img.shape[0]))
             main.getData_1(img)
         else:
             print("Error: file must be in PDF or JPEG format")
