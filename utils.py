@@ -1,4 +1,6 @@
 import cv2 as cv
+import debug
+import math
 import numpy as np
 from pdf2image import convert_from_path
 import pytesseract as tess
@@ -53,13 +55,14 @@ def getNonTabularData(image, table_outline_ctrs):
 
 
 
-def getCellContours(table_bbox, w):
+def getCellContours(table_bbox, w, h):
     """RETURNS TABLE OUTLINE BOUNDING BOX AND CELL CONTOURS"""
     table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
     table_bbox = cv.bitwise_not(table_bbox)
 
-    h, v = extractTableLines(table_bbox, w - 10, 30) # get lines        
+    h, v = extractTableLines(table_bbox, math.floor(w * 0.9), math.floor(h * 0.3)) # get lines
     cell_ctrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get cell contours
+    debug.showContours(cell_ctrs)
 
     return sortContours(cell_ctrs[1:], w)
 
@@ -67,7 +70,7 @@ def getCellContours(table_bbox, w):
 
 def removeFlatContours(ctrs):
     """REMOVES FLAT CONTOURS FROM CONTOUR LIST"""
-    return [ctr for ctr in ctrs if cv.boundingRect(ctr)[3] >= 10]
+    return [ctr for ctr in ctrs if cv.boundingRect(ctr)[3] >= 10 and cv.boundingRect(ctr)[2] >= 10]
 
 
 
@@ -86,3 +89,25 @@ def pdfToJpg(path):
         pageNum += 1
     
     return len(pages)
+
+
+
+def deskewImg(thresh):
+    """FIND SKEW ON IMAGE, DESKEW, AND RETURN DESKEWED IMAGE"""
+    # get all coords of white pixels and find a boundary around them
+    coords = np.column_stack(np.where(thresh > 0))
+    angle = cv.minAreaRect(coords)[-1]
+    print(angle)
+
+    # special case
+    if angle < -45:
+        angle = -(90 + angle)
+    else:
+        angle = -angle
+
+    # get center of image then rotate
+    (h, w) = thresh.shape[:2]
+    center = (w // 2, h // 2)
+    M = cv.getRotationMatrix2D(center, angle, 1.0)
+
+    return cv.warpAffine(thresh, M, (w, h), flags=cv.INTER_CUBIC, borderMode=cv.BORDER_REPLICATE)

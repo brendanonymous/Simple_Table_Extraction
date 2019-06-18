@@ -1,28 +1,37 @@
 import cv2 as cv
 import debug
 import json
+import math
 import utils
 
-def getData_1(original_image):
+def getData_1(orig_img):
     """GENERIC FUNCTION TO GET TABULAR AND NON TABULAR DATA"""
     ###############################################
     # CONVERT COLORSPACE TO NEGATIVE
     ###############################################
-    original_image = cv.resize(original_image, (830, 1170), interpolation = cv.INTER_AREA) # might have a lot of overhead depending on img size
-    gray_image = cv.cvtColor(original_image, cv.COLOR_BGR2GRAY)
+    orig_img = cv.resize(orig_img, (orig_img.shape[1] // 5, orig_img.shape[0] // 5), interpolation = cv.INTER_AREA) # might have a lot of overhead depending on img size
+    gray_image = cv.cvtColor(orig_img, cv.COLOR_BGR2GRAY)
 
 
     ###############################################
     # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
     ###############################################
-    threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
-    threshold = cv.bitwise_not(threshold)
+    thresh = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
+    thresh = cv.bitwise_not(thresh)
+
+
+    ###############################################
+    # DESKEW IMAGE
+    ###############################################
+    debug.showImage(thresh, "original", 80)# DEBUG
+    thresh = utils.deskewImg(thresh)
+    debug.showImage(thresh, "deskewed", 80)# DEBUG
 
 
     ###############################################
     # EXTRACT TABLE LINES
     ###############################################
-    horizontal, vertical = utils.extractTableLines(threshold, 150, 30)    
+    horizontal, vertical = utils.extractTableLines(thresh, math.floor(thresh.shape[1] * 0.20), math.floor(thresh.shape[0] * 0.026))
 
 
     ###############################################
@@ -47,7 +56,7 @@ def getData_1(original_image):
         x, y, w, h = cv.boundingRect(table_ctr)
         table_bbox = gray_image[y - 1:y + h + 1, x - 1:x + w + 1]
 
-        cell_ctrs = utils.getCellContours(table_bbox, w)
+        cell_ctrs = utils.getCellContours(table_bbox, w, h)
         
         key = "table {}".format(table_num)
         data[key] = {}
@@ -74,7 +83,7 @@ def getData_1(original_image):
             # signifiy if OCR returned empty string
             v = utils.run_tesseract(cell_bbox, 3, 3)
             if v == "":
-                v = "NULL"
+                v = "--EMPTY--"
 
             data[key]["row " + str(row)].append(("col " + str(col), v))
 
@@ -94,3 +103,4 @@ def getData_1(original_image):
 
     print(json_data)
 
+    exit()
