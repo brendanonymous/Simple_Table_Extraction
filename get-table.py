@@ -23,7 +23,7 @@ if __name__ == "__main__":
             img = cv.imread(imagePath)
             main.getData_1(img)
         else:
-            print("Error: file must be in PDF or JPEG format")
+            sys.exit("Error: file must be in PDF or JPEG format")
     else:
-        print("Error: Usage: python get-table.py <path to image>")
+        sys.exit("Error: Usage: python get-table.py <path to image>")
     

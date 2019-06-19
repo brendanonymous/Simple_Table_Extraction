@@ -2,6 +2,7 @@ import cv2 as cv
 import debug
 import json
 import math
+import sys
 import utils
 
 def getData_1(orig_img):
@@ -21,26 +22,30 @@ def getData_1(orig_img):
 
 
     ###############################################
-    # DESKEW IMAGE
+    # CHECK SKEW ON IMAGE
     ###############################################
     debug.showImage(thresh, "original", 80)# DEBUG
-    thresh = utils.deskewImg(thresh)
-    debug.showImage(thresh, "deskewed", 80)# DEBUG
+    skewAngle = utils.skewAngle(thresh)
+    if skewAngle != 0.0:
+        sys.exit("Error: Input: scanned document must not be skewed")
 
-
+    print ("here")
+    exit()
     ###############################################
     # EXTRACT TABLE LINES
     ###############################################
-    horizontal, vertical = utils.extractTableLines(thresh, math.floor(thresh.shape[1] * 0.20), math.floor(thresh.shape[0] * 0.026))
+    horizontal, vertical = utils.extractTableLines(thresh, math.floor(thresh.shape[1] * 0.2), math.floor(thresh.shape[0] * 0.026))
 
 
     ###############################################
     # CREATE LINE MASK AND FIND EXTERNAL CONTOURS
     ###############################################
     line_mask = horizontal + vertical
+    debug.showImage(line_mask, "line mask", 80)
 
     table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
     table_ctrs = utils.removeFlatContours(table_ctrs)
+    debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG 
 
 
     # ###############################################
@@ -54,9 +59,11 @@ def getData_1(orig_img):
     # for each table outline contour, get cell contours then perform OCR
     for table_ctr in table_ctrs:
         x, y, w, h = cv.boundingRect(table_ctr)
-        table_bbox = gray_image[y - 1:y + h + 1, x - 1:x + w + 1]
+        table_bbox = gray_image[y - 5:y + h + 5, x - 1:x + w + 1]
+        debug.showImage(table_bbox, "cell bbox")# DEBUG
 
-        cell_ctrs = utils.getCellContours(table_bbox, w, h)
+        cell_ctrs = utils.getCellContours(table_bbox, table_bbox.shape[1], table_bbox.shape[0])
+        debug.showContours(cell_ctrs, "cell ctrs", 80)# DEBUG
         
         key = "table {}".format(table_num)
         data[key] = {}
@@ -102,5 +109,3 @@ def getData_1(orig_img):
     json_data = json.dumps(data, indent=3, ensure_ascii=False)
 
     print(json_data)
-
-    exit()

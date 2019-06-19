@@ -4,6 +4,7 @@ import math
 import numpy as np
 from pdf2image import convert_from_path
 import pytesseract as tess
+from scipy import ndimage
 
 
 def run_tesseract(image, psm, oem):
@@ -60,9 +61,9 @@ def getCellContours(table_bbox, w, h):
     table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
     table_bbox = cv.bitwise_not(table_bbox)
 
-    h, v = extractTableLines(table_bbox, math.floor(w * 0.9), math.floor(h * 0.3)) # get lines
+    h, v = extractTableLines(table_bbox, math.floor(w * 0.15), math.floor(h * 0.3)) # get lines
     cell_ctrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get cell contours
-    debug.showContours(cell_ctrs)
+    cell_ctrs = removeFlatContours(cell_ctrs)
 
     return sortContours(cell_ctrs[1:], w)
 
@@ -92,22 +93,18 @@ def pdfToJpg(path):
 
 
 
-def deskewImg(thresh):
-    """FIND SKEW ON IMAGE, DESKEW, AND RETURN DESKEWED IMAGE"""
-    # get all coords of white pixels and find a boundary around them
-    coords = np.column_stack(np.where(thresh > 0))
-    angle = cv.minAreaRect(coords)[-1]
-    print(angle)
+def skewAngle(thresh):
+    """FIND SKEW ANGLE ON IMAGE AND RETURN"""    
+    edges = cv.Canny(thresh, 100, 100, apertureSize=3)
+    lines = cv.HoughLinesP(edges, 1, math.pi / 180.0, 100, minLineLength=100, maxLineGap=5)
 
-    # special case
-    if angle < -45:
-        angle = -(90 + angle)
-    else:
-        angle = -angle
+    angles = []
 
-    # get center of image then rotate
-    (h, w) = thresh.shape[:2]
-    center = (w // 2, h // 2)
-    M = cv.getRotationMatrix2D(center, angle, 1.0)
+    for x1, y1, x2, y2 in lines[0]:
+        cv.line(thresh, (x1, y1), (x2, y2), (255, 0, 0), 3)
+        angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+        angles.append(angle)
 
-    return cv.warpAffine(thresh, M, (w, h), flags=cv.INTER_CUBIC, borderMode=cv.BORDER_REPLICATE)
+    median_angle = np.median(angles)
+
+    return median_angle#ndimage.rotate(thresh, median_angle)
