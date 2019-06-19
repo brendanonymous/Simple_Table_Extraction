@@ -107,4 +107,16 @@ def skewAngle(thresh):
 
     median_angle = np.median(angles)
 
-    return median_angle#ndimage.rotate(thresh, median_angle)
+    return median_angle #ndimage.rotate(thresh, median_angle)
+
+
+
+def getTableColumn(columns, x):
+    """GETS COLUMN BY APPROXIMATE X COORDINATE"""
+    rng = list(range(x - 3, x + 3))
+    for n in rng:
+        v = columns.get(n, None)
+        if v is not None:
+            return v
+    
+    return False

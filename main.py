@@ -24,13 +24,12 @@ def getData_1(orig_img):
     ###############################################
     # CHECK SKEW ON IMAGE
     ###############################################
-    debug.showImage(thresh, "original", 80)# DEBUG
+    # debug.showImage(thresh, "original", 80)# DEBUG
     skewAngle = utils.skewAngle(thresh)
     if skewAngle != 0.0:
         sys.exit("Error: Input: scanned document must not be skewed")
 
-    print ("here")
-    exit()
+
     ###############################################
     # EXTRACT TABLE LINES
     ###############################################
@@ -41,11 +40,11 @@ def getData_1(orig_img):
     # CREATE LINE MASK AND FIND EXTERNAL CONTOURS
     ###############################################
     line_mask = horizontal + vertical
-    debug.showImage(line_mask, "line mask", 80)
+    # debug.showImage(line_mask, "line mask", 80)
 
     table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
     table_ctrs = utils.removeFlatContours(table_ctrs)
-    debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG 
+    # debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG 
 
 
     # ###############################################
@@ -60,15 +59,17 @@ def getData_1(orig_img):
     for table_ctr in table_ctrs:
         x, y, w, h = cv.boundingRect(table_ctr)
         table_bbox = gray_image[y - 5:y + h + 5, x - 1:x + w + 1]
-        debug.showImage(table_bbox, "cell bbox")# DEBUG
+        # debug.showImage(table_bbox, "cell bbox")# DEBUG
 
         cell_ctrs = utils.getCellContours(table_bbox, table_bbox.shape[1], table_bbox.shape[0])
-        debug.showContours(cell_ctrs, "cell ctrs", 80)# DEBUG
+        # debug.showContours(cell_ctrs, "cell ctrs", 80)# DEBUG
         
         key = "table {}".format(table_num)
         data[key] = {}
         visited_rows = []
+        visited_cols = {} # key is y coord of cell, value is column number
         row = 0
+        col = 1
 
         for cell_ctr in cell_ctrs:
             x, y, w, h = cv.boundingRect(cell_ctr)
@@ -81,10 +82,10 @@ def getData_1(orig_img):
             # logic to differentiate different rows and cells
             if y not in visited_rows:
                 visited_rows.append(y)
-                row += 1                
-                col = 1
+                row += 1
                 data[key]["row " + str(row)] = []
-            else:
+            if not utils.getTableColumn(visited_cols, x):
+                visited_cols[x] = col
                 col += 1
 
             # signifiy if OCR returned empty string
@@ -92,7 +93,7 @@ def getData_1(orig_img):
             if v == "":
                 v = "--EMPTY--"
 
-            data[key]["row " + str(row)].append(("col " + str(col), v))
+            data[key]["row " + str(row)].append(("col " + str(utils.getTableColumn(visited_cols, x)), v))
 
         table_num += 1
 
