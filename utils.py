@@ -2,9 +2,14 @@ import cv2 as cv
 import debug
 import math
 import numpy as np
-from pdf2image import convert_from_path
+import os
+from pdf2image import convert_from_path, convert_from_bytes
 import pytesseract as tess
+import re
 from scipy import ndimage
+import tempfile
+import time
+from wand.image import Image
 
 
 def run_tesseract(image, psm, oem):
@@ -19,6 +24,14 @@ def run_tesseract(image, psm, oem):
         text = tess.image_to_string(image, lang=language, config=configuration)
 
     return text
+
+
+
+def getTextRotationAngle(image):
+    """GET ORIENTATION OF TEXT IN DOCUMENT"""
+    data = tess.image_to_osd(image)
+    rotation = re.search('(?<=Rotate: )\d+', data).group(0)
+    return int(rotation)
 
 
 
@@ -61,7 +74,7 @@ def getCellContours(table_bbox, w, h):
     table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
     table_bbox = cv.bitwise_not(table_bbox)
 
-    h, v = extractTableLines(table_bbox, math.floor(w * 0.15), math.floor(h * 0.3)) # get lines
+    h, v = extractTableLines(table_bbox, math.floor(w * 0.5), math.floor(h * 0.3)) # get lines 0.15 0.3
     cell_ctrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get cell contours
     cell_ctrs = removeFlatContours(cell_ctrs)
 
@@ -81,15 +94,109 @@ def sortContours(ctrs, w):
 
 
 
-def pdfToJpg(path):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def pdfToJpg(fp):
     """CONVERT PDF TO IMAGE, SAVE, AND RETURN NUMBER OF PAGES"""
-    pages = convert_from_path(path, 500)
-    pageNum = 1
-    for page in pages:
-        page.save("out{}.jpg".format(pageNum), "JPEG")
-        pageNum += 1
+    with(Image(filename=fp, resolution=120)) as source: 
+        images = source.sequence
+        pages = len(images)
+        for i in range(pages):
+            n = i + 1
+            newfilename = out + str(n) + '.jpeg'
+            Image(images[i]).save(filename=newfilename)
+    exit()
+    # t0 = time.time()
+
+    # images = convert_from_path(fp, dpi=500, output_folder=os.getcwd(), fmt="JPEG", thread_count=4)
+
     
-    return len(pages)
+    # pageNum = 1
+    # for image in images:
+    #     image.save("out{}".format(pageNum), "JPEG")
+    #     pageNum += 1
+    
+    
+    # t1 = time.time()
+    
+    # total = t1-t0
+    
+    
+    # # return len(pages)
+    # print(total)
+    # exit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
