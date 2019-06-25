@@ -60,4 +60,3 @@ def showContoursOnImage(contours, image, scalePercent=100):
         img = image
         cv.drawContours(img, contours, i, (0, 0, 255), 1)
         showImage(img, "image with contour", scalePercent)
-
