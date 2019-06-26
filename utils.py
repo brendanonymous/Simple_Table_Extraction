@@ -2,13 +2,9 @@ import cv2 as cv
 import debug
 import math
 import numpy as np
-import os
-from pdf2image import convert_from_path, convert_from_bytes
 import pytesseract as tess
 import re
 from scipy import ndimage
-import tempfile
-import time
 from wand.image import Image
 
 
@@ -27,11 +23,23 @@ def run_tesseract(image, psm, oem):
 
 
 
-def getTextRotationAngle(image):
-    """GET ORIENTATION OF TEXT IN DOCUMENT"""
+def getTextOrientationAngle(image):
+    """GET ORIENTATION ANGLE OF TEXT IN DOCUMENT"""
     data = tess.image_to_osd(image)
     rotation = re.search('(?<=Rotate: )\d+', data).group(0)
     return int(rotation)
+
+
+
+def rotateImage(image, angle):
+    """ROTATE AN IMAGE BY A GIVEN ANGLE"""
+    if angle != 360:
+        center = (image.shape[1] // 2, image.shape[0] // 2)
+        M = cv.getRotationMatrix2D(center, angle, 1.0)
+
+        return cv.warpAffine(image, M, (image.shape[0], image.shape[1]))
+    
+    return image
 
 
 
