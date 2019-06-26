@@ -24,10 +24,15 @@ def getData_1(orig_img):
     ###############################################
     # CHECK SKEW ON IMAGE
     ###############################################
-    # debug.showImage(thresh, "original", 80)# DEBUG
     skewAngle = utils.skewAngle(thresh)
     if skewAngle != 0.0:
         sys.exit("Error: Input: scanned document must not be skewed")
+
+
+    ###############################################
+    # CHECK ORIENTATION ON TEXT AND ROTATE
+    ###############################################
+    # rotationAngle = getTextRotationAngle(thresh)
 
 
     ###############################################
@@ -44,7 +49,7 @@ def getData_1(orig_img):
 
     table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
     table_ctrs = utils.removeFlatContours(table_ctrs)
-    # debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG 
+    # debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG
 
 
     # ###############################################
@@ -62,7 +67,7 @@ def getData_1(orig_img):
         # debug.showImage(table_bbox, "cell bbox")# DEBUG
 
         cell_ctrs = utils.getCellContours(table_bbox, table_bbox.shape[1], table_bbox.shape[0])
-        # debug.showContours(cell_ctrs, "cell ctrs", 80)# DEBUG
+        debug.showContours(cell_ctrs, "cell ctrs", 80)# DEBUG
         
         key = "table {}".format(table_num)
         data[key] = {}

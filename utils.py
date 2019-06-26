@@ -74,7 +74,7 @@ def getCellContours(table_bbox, w, h):
     table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
     table_bbox = cv.bitwise_not(table_bbox)
 
-    h, v = extractTableLines(table_bbox, math.floor(w * 0.5), math.floor(h * 0.3)) # get lines 0.15 0.3
+    h, v = extractTableLines(table_bbox, math.floor(w * 0.3), math.floor(h * 0.3)) # get lines 0.15 0.3
     cell_ctrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get cell contours
     cell_ctrs = removeFlatContours(cell_ctrs)
 
@@ -133,14 +133,15 @@ def sortContours(ctrs, w):
 
 def pdfToJpg(fp):
     """CONVERT PDF TO IMAGE, SAVE, AND RETURN NUMBER OF PAGES"""
-    with(Image(filename=fp, resolution=120)) as source: 
+    with(Image(filename=fp, resolution=600)) as source: 
         images = source.sequence
         pages = len(images)
         for i in range(pages):
             n = i + 1
-            newfilename = out + str(n) + '.jpeg'
+            newfilename = "out" + str(n) + '.jpg'
             Image(images[i]).save(filename=newfilename)
-    exit()
+    
+    return pages
     # t0 = time.time()
 
     # images = convert_from_path(fp, dpi=500, output_folder=os.getcwd(), fmt="JPEG", thread_count=4)
