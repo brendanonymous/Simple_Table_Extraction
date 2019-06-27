@@ -19,20 +19,26 @@ def getData_1(orig_img):
     ###############################################
     thresh = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
     thresh = cv.bitwise_not(thresh)
-
-
-    ###############################################
-    # CHECK SKEW ON IMAGE
-    ###############################################
-    skewAngle = utils.skewAngle(thresh)
-    if skewAngle != 0.0:
-        sys.exit("Error: Input: scanned document must not be skewed")
+    debug.showImage(thresh, "original", 80)# DEBUG
 
 
     ###############################################
     # CHECK ORIENTATION ON TEXT AND ROTATE
     ###############################################
-    # rotationAngle = getTextRotationAngle(thresh)
+    orientationAngle = utils.getTextOrientationAngle(thresh)
+    rotatedImage = utils.rotateImage(thresh, 360 - orientationAngle)
+    debug.showImage(rotatedImage, "rotated", 80)# DEBUG
+
+
+    ###############################################
+    # CHECK SKEW ON IMAGE
+    ###############################################
+    # skewAngle = utils.skewAngle(thresh)
+    # if skewAngle != 0.0:
+    #     sys.exit("Error: Input: scanned document must not be skewed")
+
+
+    
 
 
     ###############################################
