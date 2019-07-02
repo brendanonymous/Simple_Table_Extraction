@@ -10,52 +10,50 @@ def getData_1(orig_img):
     ###############################################
     # CONVERT COLORSPACE TO NEGATIVE
     ###############################################
-    orig_img = cv.resize(orig_img, (orig_img.shape[1] // 5, orig_img.shape[0] // 5), interpolation = cv.INTER_AREA) # might have a lot of overhead depending on img size
-    gray_image = cv.cvtColor(orig_img, cv.COLOR_BGR2GRAY)
-
+    resized_image = cv.resize(orig_img, (orig_img.shape[1] // 5, orig_img.shape[0] // 5), interpolation = cv.INTER_AREA) # might have a lot of overhead depending on img size
+    gray_image = cv.cvtColor(resized_image, cv.COLOR_BGR2GRAY)
+    
+    # threshold originally here
 
     ###############################################
-    # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
+    # DESKEW IMAGE
     ###############################################
-    thresh = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
-    thresh = cv.bitwise_not(thresh)
-    debug.showImage(thresh, "original", 80)# DEBUG
+    deskewed = utils.deskewImage(orig_img) # thresh
+    # debug.showImage(deskewed, "deskew", 80)# DEBUG
 
 
     ###############################################
     # CHECK ORIENTATION ON TEXT AND ROTATE
     ###############################################
-    orientationAngle = utils.getTextOrientationAngle(thresh)
-    rotatedImage = utils.rotateImage(thresh, 360 - orientationAngle)
-    debug.showImage(rotatedImage, "rotated", 80)# DEBUG
-
-
-    ###############################################
-    # CHECK SKEW ON IMAGE
-    ###############################################
-    # skewAngle = utils.skewAngle(thresh)
-    # if skewAngle != 0.0:
-    #     sys.exit("Error: Input: scanned document must not be skewed")
-
-
+    orientationAngle = utils.getTextOrientationAngle(deskewed)
+    rotated = utils.rotateImage(gray_image, 360 - orientationAngle)
     
+    debug.showImage(rotated, "rotated", 80)# DEBUG
+
+
+    ###############################################
+    # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
+    ###############################################
+    thresh = cv.adaptiveThreshold(rotated, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
+    thresh = cv.bitwise_not(thresh)
+    debug.showImage(thresh, "thresh", 80)# DEBUG
 
 
     ###############################################
     # EXTRACT TABLE LINES
     ###############################################
-    horizontal, vertical = utils.extractTableLines(thresh, math.floor(thresh.shape[1] * 0.2), math.floor(thresh.shape[0] * 0.026))
+    horizontal, vertical = utils.extractTableLines(thresh, math.floor(thresh.shape[1] * 0.2), math.floor(rotated.shape[0] * 0.026))
 
 
     ###############################################
     # CREATE LINE MASK AND FIND EXTERNAL CONTOURS
     ###############################################
     line_mask = horizontal + vertical
-    # debug.showImage(line_mask, "line mask", 80)
+    debug.showImage(line_mask, "line mask", 80)
 
     table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
     table_ctrs = utils.removeFlatContours(table_ctrs)
-    # debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG
+    debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG
 
 
     # ###############################################

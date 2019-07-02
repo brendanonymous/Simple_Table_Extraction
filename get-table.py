@@ -18,7 +18,10 @@ if __name__ == "__main__":
             num_pages = utils.pdfToJpg(imagePath)
             for i in range(num_pages):
                 img = cv.imread("out{}.jpg".format(i + 1))
-                main.getData_1(img)
+                try:
+                    main.getData_1(img)
+                except:
+                    print("Processing page failed. Skipping.")
         elif imagePath[-4:] == ".jpg":
             img = cv.imread(imagePath)
             main.getData_1(img)
