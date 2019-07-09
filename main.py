@@ -12,6 +12,9 @@ def getData_1(orig_img):
     ###############################################
     resized_image = cv.resize(orig_img, (orig_img.shape[1] // 5, orig_img.shape[0] // 5), interpolation = cv.INTER_AREA) # might have a lot of overhead depending on img size
     gray_image = cv.cvtColor(resized_image, cv.COLOR_BGR2GRAY)
+
+    # utils.extractCircles(resized_image)
+    # exit()
     
     # threshold originally here
 
@@ -28,13 +31,13 @@ def getData_1(orig_img):
     orientationAngle = utils.getTextOrientationAngle(deskewed)
     rotated = utils.rotateImage(gray_image, 360 - orientationAngle)
     
-    debug.showImage(rotated, "rotated", 80)# DEBUG
+    # debug.showImage(rotated, "rotated", 80)# DEBUG
 
 
     ###############################################
     # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
     ###############################################
-    thresh = cv.adaptiveThreshold(rotated, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
+    thresh = cv.adaptiveThreshold(rotated, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 3, 2)     # 11
     thresh = cv.bitwise_not(thresh)
     debug.showImage(thresh, "thresh", 80)# DEBUG
 
@@ -53,7 +56,7 @@ def getData_1(orig_img):
 
     table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
     table_ctrs = utils.removeFlatContours(table_ctrs)
-    debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG
+    # debug.showContours(table_ctrs, "table ctrs", 70)# DEBUG
 
 
     # ###############################################
@@ -63,15 +66,16 @@ def getData_1(orig_img):
     table_num = 1
 
     table_ctrs = utils.sortContours(table_ctrs, cv.boundingRect(line_mask)[2]) # sort contours left-to-right, top-to-bottom
+    debug.showContours(table_ctrs, title="table ctrs", scalePercent=90)
 
     # for each table outline contour, get cell contours then perform OCR
     for table_ctr in table_ctrs:
         x, y, w, h = cv.boundingRect(table_ctr)
-        table_bbox = gray_image[y - 5:y + h + 5, x - 1:x + w + 1]
-        # debug.showImage(table_bbox, "cell bbox")# DEBUG
+        table_bbox = cv.bitwise_not(thresh[y - 5:y + h + 5, x - 1:x + w + 1]) # was gray_image
+        debug.showImage(table_bbox, "table bbox")# DEBUG
 
         cell_ctrs = utils.getCellContours(table_bbox, table_bbox.shape[1], table_bbox.shape[0])
-        debug.showContours(cell_ctrs, "cell ctrs", 80)# DEBUG
+        debug.showContours(cell_ctrs, title="cell ctrs", scalePercent=110)# DEBUG
         
         key = "table {}".format(table_num)
         data[key] = {}
@@ -82,11 +86,13 @@ def getData_1(orig_img):
 
         for cell_ctr in cell_ctrs:
             x, y, w, h = cv.boundingRect(cell_ctr)
-            cell_bbox = table_bbox[y:y + h, x:x + w]
+            cell_bbox = table_bbox[y:y + h, x:x + w] # gray_image
 
             # detect headers for specific table style
             if cv.mean(cell_bbox)[0] < 155:
                 _, cell_bbox = cv.threshold(cell_bbox, 200, 255, cv.THRESH_BINARY_INV)
+            
+            # debug.showImage(cell_bbox, "cell bbox")# DEBUG
 
             # logic to differentiate different rows and cells
             if y not in visited_rows:
@@ -98,7 +104,7 @@ def getData_1(orig_img):
                 col += 1
 
             # signifiy if OCR returned empty string
-            v = utils.run_tesseract(cell_bbox, 3, 3)
+            v = utils.run_tesseract(cell_bbox, 3, 3) # was 3
             if v == "":
                 v = "--EMPTY--"
 

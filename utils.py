@@ -117,6 +117,27 @@ def extractTableLines(image, horizontal_kernel_size, vertical_kernel_size):
 
 
 
+def extractCircles(image):
+    bilateral_filtered_image = cv.bilateralFilter(image, 5, 175, 175)
+    debug.showImage(bilateral_filtered_image, "bfi", scalePercent=80)
+    edge_detected_image = cv.Canny(bilateral_filtered_image, 75, 200)
+    debug.showImage(edge_detected_image, "bfi", scalePercent=80)
+    contours, _= cv.findContours(edge_detected_image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    debug.showContours(contours)
+
+    contour_list = []
+    for contour in contours:
+        approx = cv.approxPolyDP(contour,0.01*cv.arcLength(contour,True),True)
+        area = cv.contourArea(contour)
+        if ((len(approx) > 21) & (area > 30) ):
+            contour_list.append(contour)
+
+    
+    debug.showContours(contour_list)
+    
+
+
+
 def getNonTabularData(image, table_outline_ctrs):
     """EXTRACTS ALL DATA THAT IS NOT IN TABLE"""
     text_only = image
@@ -135,7 +156,7 @@ def getCellContours(table_bbox, w, h):
     table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
     table_bbox = cv.bitwise_not(table_bbox)
 
-    h, v = extractTableLines(table_bbox, math.floor(w * 0.5), math.floor(h * 0.3)) # get lines 0.15 0.3
+    h, v = extractTableLines(table_bbox, math.floor(w * 0.5), math.floor(h * 0.1)) # get lines 0.15 0.3
     cell_ctrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get cell contours
     cell_ctrs = removeFlatContours(cell_ctrs)
 
@@ -145,7 +166,9 @@ def getCellContours(table_bbox, w, h):
 
 def removeFlatContours(ctrs):
     """REMOVES FLAT CONTOURS FROM CONTOUR LIST"""
-    return [ctr for ctr in ctrs if cv.boundingRect(ctr)[3] >= 10 and cv.boundingRect(ctr)[2] >= 10]
+    return [ctr for ctr in ctrs if len(cv.approxPolyDP(ctr, 0.01*cv.arcLength(ctr, True), True)) == 4 and \
+                                                                        cv.boundingRect(ctr)[3] >= 10 and \
+                                                                        cv.boundingRect(ctr)[2] >= 10]
 
 
 
