@@ -72,7 +72,7 @@ def getData_1(original_image):
                 col += 1
 
             # signifiy if OCR returned empty string
-            v = utils.run_tesseract(cell_bbox, 3, 3)
+            v = utils.run_tesseract(cell_bbox, 6, 3)
             if v == "":
                 v = "NULL"
 

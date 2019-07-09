@@ -79,7 +79,7 @@ def sortContours(ctrs, w):
 
 def pdfToJpg(path):
     """CONVERT PDF TO IMAGE, SAVE, AND RETURN NUMBER OF PAGES"""
-    pages = convert_from_path(path, 500)
+    pages = convert_from_path(path)
     pageNum = 1
     for page in pages:
         page.save("out{}.jpg".format(pageNum), "JPEG")
