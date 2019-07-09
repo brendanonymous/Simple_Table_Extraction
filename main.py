@@ -17,6 +17,7 @@ def getData_1(original_image):
     ###############################################
     threshold = cv.adaptiveThreshold(gray_image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)    
     threshold = cv.bitwise_not(threshold)
+    debug.showImage(threshold, "thresh", 80)
 
 
     ###############################################
@@ -29,6 +30,7 @@ def getData_1(original_image):
     # CREATE LINE MASK AND FIND EXTERNAL CONTOURS
     ###############################################
     line_mask = horizontal + vertical
+    debug.showImage(line_mask, "mask", 80)
 
     table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
     table_ctrs = utils.removeFlatContours(table_ctrs)
@@ -41,6 +43,7 @@ def getData_1(original_image):
     table_num = 1
 
     table_ctrs = utils.sortContours(table_ctrs, cv.boundingRect(line_mask)[2]) # sort contours left-to-right, top-to-bottom
+    debug.showContours(table_ctrs)
 
     # for each table outline contour, get cell contours then perform OCR
     for table_ctr in table_ctrs:
@@ -48,6 +51,7 @@ def getData_1(original_image):
         table_bbox = gray_image[y - 1:y + h + 1, x - 1:x + w + 1]
 
         cell_ctrs = utils.getCellContours(table_bbox, w)
+        debug.showContours(cell_ctrs)
         
         key = "table {}".format(table_num)
         data[key] = {}
