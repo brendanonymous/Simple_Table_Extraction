@@ -38,7 +38,9 @@ def getData_1(orig_img):
     # APPLY ADAPTIVE THRESHOLD AND NEGATIVE
     ###############################################
     thresh = cv.adaptiveThreshold(rotated, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 3, 2)     # 11
+    # th, thresh2 = cv.threshold(rotated,127,255, cv.THRESH_BINARY|cv.THRESH_OTSU)
     thresh = cv.bitwise_not(thresh)
+    # thresh2 = cv.bitwise_not(thresh2)
     debug.showImage(thresh, "thresh", 80)# DEBUG
 
 
@@ -72,7 +74,9 @@ def getData_1(orig_img):
     for table_ctr in table_ctrs:
         x, y, w, h = cv.boundingRect(table_ctr)
         table_bbox = cv.bitwise_not(thresh[y - 5:y + h + 5, x - 1:x + w + 1]) # was gray_image
+        # table_bbox2 = cv.bitwise_not(thresh2[y - 5:y + h + 5, x - 1:x + w + 1]) # was gray_image
         debug.showImage(table_bbox, "table bbox")# DEBUG
+        
 
         cell_ctrs = utils.getCellContours(table_bbox, table_bbox.shape[1], table_bbox.shape[0])
         debug.showContours(cell_ctrs, title="cell ctrs", scalePercent=110)# DEBUG
@@ -86,13 +90,14 @@ def getData_1(orig_img):
 
         for cell_ctr in cell_ctrs:
             x, y, w, h = cv.boundingRect(cell_ctr)
-            cell_bbox = table_bbox[y:y + h, x:x + w] # gray_image
+            cell_bbox = table_bbox[y:y + h, x:x + w]
+            # cell_bbox = table_bbox2[y:y + h, x:x + w] # gray_image
 
             # detect headers for specific table style
             if cv.mean(cell_bbox)[0] < 155:
                 _, cell_bbox = cv.threshold(cell_bbox, 200, 255, cv.THRESH_BINARY_INV)
             
-            # debug.showImage(cell_bbox, "cell bbox")# DEBUG
+            debug.showImage(cell_bbox, "cell bbox")# DEBUG
 
             # logic to differentiate different rows and cells
             if y not in visited_rows:
