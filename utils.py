@@ -49,6 +49,12 @@ def run_tesseract(image, psm, oem):
 
     # Run tesseract
     text = tess.image_to_string(image, lang=language, config=configuration)
+    # data = tess.image_to_data(image, output_type='data.frame')
+    # data = data[data.conf != -1]
+    # lines = data.groupby('block_num')['text'].apply(list)
+    # conf = data.groupby(['block_num'])['conf'].mean()
+
+    # print (conf)
     if len(text.strip()) == 0:
         configuration += " -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-."
         text = tess.image_to_string(image, lang=language, config=configuration)
@@ -57,28 +63,43 @@ def run_tesseract(image, psm, oem):
 
 
 
-def deskewImage(thresh):
-    """FIND SKEW ANGLE ON IMAGE, DESKEW, AND RETURN"""    
-    edges = cv.Canny(thresh, 100, 100, apertureSize=3)
+def getLineAndTextThresholds(image):
+    """APPLY THRESHOLDS FOR LINE EXTRACTION AND TEXT READABILITY"""
+    line_thresh = cv.adaptiveThreshold(image, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 3, 3)
+    line_thresh = cv.bitwise_not(line_thresh)
+    line_thresh = cv.morphologyEx(line_thresh, cv.MORPH_CLOSE, np.ones((2, 2), np.uint8))
+
+    _, text_thresh = cv.threshold(image, 0, 255, cv.THRESH_BINARY|cv.THRESH_OTSU)
+    text_thresh = cv.bitwise_not(text_thresh)
+    
+    return line_thresh, text_thresh
+
+
+
+def deskewImage(image):
+    """FIND SKEW ANGLE ON IMAGE, DESKEW, AND RETURN"""
+    edges = cv.Canny(image, 100, 100, apertureSize=3)
     lines = cv.HoughLinesP(edges, 1, math.pi / 180.0, 100, minLineLength=100, maxLineGap=5)
 
-    angles = []
+    if lines is not None:
+        img_copy = image    
+        angles = []
 
-    for x1, y1, x2, y2 in lines[0]:
-        cv.line(thresh, (x1, y1), (x2, y2), (255, 0, 0), 3)
-        angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
-        angles.append(angle)
+        for x1, y1, x2, y2 in lines[0]:
+            cv.line(img_copy, (x1, y1), (x2, y2), (0, 0, 0), 1) # do we need this
+            angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+            angles.append(angle)
 
-    median_angle = np.median(angles)
+        median_angle = np.median(angles)
 
-    return ndimage.rotate(thresh, median_angle)
-
+        return ndimage.rotate(image, median_angle)
+    
+    return image
 
 
 def getTextOrientationAngle(image):
     """GET ORIENTATION ANGLE OF TEXT IN DOCUMENT"""
     data = tess.image_to_osd(image)
-    print (data)
     rotation = re.search('(?<=Rotate: )\d+', data).group(0)
     return int(rotation)
 
@@ -119,11 +140,8 @@ def extractTableLines(image, horizontal_kernel_size, vertical_kernel_size):
 
 def extractCircles(image):
     bilateral_filtered_image = cv.bilateralFilter(image, 5, 175, 175)
-    debug.showImage(bilateral_filtered_image, "bfi", scalePercent=80)
     edge_detected_image = cv.Canny(bilateral_filtered_image, 75, 200)
-    debug.showImage(edge_detected_image, "bfi", scalePercent=80)
     contours, _= cv.findContours(edge_detected_image, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    debug.showContours(contours)
 
     contour_list = []
     for contour in contours:
@@ -131,9 +149,7 @@ def extractCircles(image):
         area = cv.contourArea(contour)
         if ((len(approx) > 21) & (area > 30) ):
             contour_list.append(contour)
-
     
-    debug.showContours(contour_list)
     
 
 
@@ -151,16 +167,31 @@ def getNonTabularData(image, table_outline_ctrs):
 
 
 
-def getCellContours(table_bbox, w, h):
-    """RETURNS TABLE OUTLINE BOUNDING BOX AND CELL CONTOURS"""
-    table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
-    table_bbox = cv.bitwise_not(table_bbox)
+def getTableContours(line_mask):
+    """RETURNS TABLE OUTLINE CONTOURS FROM LINE MASK"""
+    table_ctrs, _ = cv.findContours(line_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE) # table outlines
+    table_ctrs = removeFlatContours(table_ctrs)
+    table_ctrs = sortContours(table_ctrs, cv.boundingRect(line_mask)[2]) # sort contours left-to-right, top-to-bottom
+    
+    return table_ctrs
 
-    h, v = extractTableLines(table_bbox, math.floor(w * 0.5), math.floor(h * 0.1)) # get lines 0.15 0.3
+
+
+def getCellContours(table_bbox, w, h):
+    """RETURNS CELL CONTOURS FOUND WITHIN TABLE BOUNDING BOX"""
+    table_bbox = cv.adaptiveThreshold(table_bbox, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 3, 1)
+    table_bbox = cv.bitwise_not(table_bbox)    
+    # table_bbox = cv.morphologyEx(table_bbox, cv.MORPH_CLOSE, np.ones((6, 6), np.uint8))
+    # debug.showImage(table_bbox, "table bbox", 80)# DEBUG
+
+    h, v = extractTableLines(table_bbox, math.floor(w * 0.2), math.floor(h * 0.15))
+    debug.showImage(h+v, "line mask", 150)# DEBUG
+
     cell_ctrs, _ = cv.findContours(h + v, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE) # get cell contours
     cell_ctrs = removeFlatContours(cell_ctrs)
+    cell_ctrs = sortContours(cell_ctrs[1:], w)
 
-    return sortContours(cell_ctrs[1:], w)
+    return cell_ctrs
 
 
 
