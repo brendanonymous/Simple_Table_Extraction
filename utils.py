@@ -4,6 +4,18 @@ from pdf2image import convert_from_path
 import pytesseract as tess
 
 
+def pdfToJpg(path):
+    """CONVERT PDF TO IMAGE, SAVE, AND RETURN NUMBER OF PAGES"""
+    pages = convert_from_path(path)
+    pageNum = 1
+    for page in pages:
+        page.save("out{}.jpg".format(pageNum), "JPEG")
+        pageNum += 1
+    
+    return len(pages)
+
+
+
 def run_tesseract(image, psm, oem):
     """RUNS TESSERACT TO PERFORM OCR"""
     language = 'eng'
@@ -77,12 +89,3 @@ def sortContours(ctrs, w):
 
 
 
-def pdfToJpg(path):
-    """CONVERT PDF TO IMAGE, SAVE, AND RETURN NUMBER OF PAGES"""
-    pages = convert_from_path(path)
-    pageNum = 1
-    for page in pages:
-        page.save("out{}.jpg".format(pageNum), "JPEG")
-        pageNum += 1
-    
-    return len(pages)
