@@ -6,7 +6,7 @@ jdcal==1.4.1
 kiwisolver==1.1.0
 matplotlib==3.0.3
 numpy==1.16.3
-opencv-python==4.1.0.25
+opencv-python==4.1.1.26
 openpyxl==2.6.2
 pdf2image==1.5.4
 Pillow==6.0.0
